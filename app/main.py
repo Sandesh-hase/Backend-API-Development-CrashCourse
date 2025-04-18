@@ -48,7 +48,7 @@ def find_post_index(id):
 def root():
     return {"message": "Welcome to my api"}
 
-@app.get("/posts")
+@app.get("/posts", response_model=List[schemas.Post])
 def get_all_posts():
     posts = list(collection.find({}, {"_id": 0}))  # Exclude MongoDB's internal _id
     return posts
@@ -95,6 +95,16 @@ def get_post(id: int, response: Response):
 
     return post
 
+@app.delete("/posts/delete_null_id", status_code=status.HTTP_204_NO_CONTENT)
+def delete_posts_with_null_id():
+    result = collection.delete_many({"id": None})
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No posts with null id found"
+        )
+    return {"deleted_count": result.deleted_count}
+    
 
 # delete post
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -119,7 +129,7 @@ def update_post(id: int, post: schemas.PostBase):
     return post_dict
 
 
-@app.post("/posts/insert_many", response_model=schemas.Post)
+@app.post("/posts/insert_many")
 def insert_many_posts(posts: List[schemas.PostBase]):
     try:
         data = [post.dict() for post in posts]
@@ -130,3 +140,4 @@ def insert_many_posts(posts: List[schemas.PostBase]):
     except Exception as e:
         logger.error(f"Error inserting multiple posts: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+

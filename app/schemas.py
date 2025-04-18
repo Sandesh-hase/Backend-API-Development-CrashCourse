@@ -17,7 +17,7 @@ class PostCreate(PostBase):
 
 # Handling the data staructure getting from response
 class Post(PostBase):
-    id: int
+    id: Optional[int] = None
     created_at: datetime
 
 
