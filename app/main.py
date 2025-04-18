@@ -84,7 +84,7 @@ def get_latest_post():
 
 # get post by id
 # Handling the ids that are not found
-@app.get("/posts/{id}")
+@app.get("/posts/{id}", response_model=schemas.Post)
 def get_post(id: int, response: Response):
     post = collection.find_one({"id": id}, {"_id": 0})  # Exclude MongoDB's internal _id
     if not post:
@@ -109,7 +109,7 @@ def delete_post(id: int):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # Update request
-@app.put("/posts/{id}")
+@app.put("/posts/{id}", response_model=schemas.Post)
 def update_post(id: int, post: schemas.PostBase):
     post_dict = post.dict()
     result = collection.update_one({"id": id}, {"$set": post_dict})
@@ -119,7 +119,7 @@ def update_post(id: int, post: schemas.PostBase):
     return post_dict
 
 
-@app.post("/posts/insert_many")
+@app.post("/posts/insert_many", response_model=schemas.Post)
 def insert_many_posts(posts: List[schemas.PostBase]):
     try:
         data = [post.dict() for post in posts]

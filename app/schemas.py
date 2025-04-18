@@ -16,11 +16,8 @@ class PostCreate(PostBase):
 
 
 # Handling the data staructure getting from response
-class Post(BaseModel):
+class Post(PostBase):
     id: int
-    title: str
-    content: str
-    published: bool
     created_at: datetime
 
 
