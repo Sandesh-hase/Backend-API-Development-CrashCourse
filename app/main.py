@@ -1,12 +1,10 @@
 from fastapi import FastAPI, HTTPException, Response, status
-from pydantic import BaseModel
-from typing import Optional, List
-from random import randrange
-from pymongo import MongoClient
+from typing import List
 import time
 from datetime import datetime
 from fastapi.logger import logger
 from .database import collection
+from . import schemas
 
 app = FastAPI()
 
@@ -24,13 +22,6 @@ while retry_count < max_retries:
             time.sleep(2)
         else:
             print("Max retries reached. Exiting.")
-
-class Post(BaseModel):
-    id: Optional[int] = None
-    title: str
-    content: str
-    published: bool = True
-    rating: Optional[int] = None
 
 
 my_post = [
@@ -58,18 +49,27 @@ def root():
     return {"message": "Welcome to my api"}
 
 @app.get("/posts")
-def get_post():
+def get_all_posts():
     posts = list(collection.find({}, {"_id": 0}))  # Exclude MongoDB's internal _id
-    return {"data": posts}
+    return posts
 
-# create post and setting the status code
-@app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_post(posts: Post):
+# Create post and set the status code
+@app.post(
+    "/posts",
+    status_code=status.HTTP_201_CREATED,
+    response_model=schemas.Post
+)
+def create_post(posts: schemas.PostBase):
     try:
         data = posts.dict()
         data['created_at'] = datetime.utcnow()
         result = collection.insert_one(data)
-        return {"inserted_id": str(result.inserted_id)}
+        # Retrieve the inserted document
+        inserted_post = collection.find_one(
+            {"_id": result.inserted_id},
+            {"_id": 0}
+        )
+        return inserted_post
     except Exception as e:
         logger.error(f"Error creating post: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
@@ -80,7 +80,7 @@ def get_latest_post():
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No posts found")
 
-    return {"data": post}
+    return post
 
 # get post by id
 # Handling the ids that are not found
@@ -88,9 +88,12 @@ def get_latest_post():
 def get_post(id: int, response: Response):
     post = collection.find_one({"id": id}, {"_id": 0})  # Exclude MongoDB's internal _id
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} was not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"post with id: {id} was not found"
+        )
 
-    return {"post_detail": post}
+    return post
 
 
 # delete post
@@ -98,23 +101,26 @@ def get_post(id: int, response: Response):
 def delete_post(id: int):
     result = collection.delete_one({"id": id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} was not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"post with id: {id} was not found"
+        )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # Update request
 @app.put("/posts/{id}")
-def update_post(id: int, post: Post):
+def update_post(id: int, post: schemas.PostBase):
     post_dict = post.dict()
     result = collection.update_one({"id": id}, {"$set": post_dict})
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} was not found")
 
-    return {"data": post_dict}
+    return post_dict
 
 
 @app.post("/posts/insert_many")
-def insert_many_posts(posts: List[Post]):
+def insert_many_posts(posts: List[schemas.PostBase]):
     try:
         data = [post.dict() for post in posts]
         for post in data:
